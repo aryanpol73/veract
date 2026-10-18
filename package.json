@@ -1,0 +1,22 @@
+{
+  "name": "veract",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Pre-Authorized Outcome-Metered Settlement Engine for AI Workers via PayPal",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc",
+    "verify:sandbox": "tsx scripts/verify-paypal-sandbox.ts",
+    "verify:paypal": "tsx scripts/verify-paypal-sandbox.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.8",
+    "zod": "^4.6.7"
+  }
+}
