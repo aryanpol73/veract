@@ -10,13 +10,17 @@
     "verify:paypal": "tsx scripts/verify-paypal-sandbox.ts"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.10.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^18.0.8",
+    "express": "^5.3.0",
     "zod": "^4.6.7"
   }
 }
