@@ -13,7 +13,7 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
     try {
       const res = await fetch("/api/batches/scan-local", { method: "POST" });
       const data = await res.json();
-      setLastReport(data);
+      setLastReport({ action: "SCAN_LOCAL", ...data });
       onBatchesUpdated?.(data);
     } catch (err) {
       console.error("Failed to scan local directory:", err);
@@ -44,10 +44,58 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
         }),
       });
       const data = await res.json();
-      setLastReport(data);
+      setLastReport({ action: "AGENT_WEBHOOK", ...data });
       onBatchesUpdated?.(data);
     } catch (err) {
       console.error("Failed to trigger agent webhook:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAuditLedger = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/verifier/audit");
+      const data = await res.json();
+      setLastReport({ action: "CRYPTO_AUDIT_REPORT", ...data });
+      onBatchesUpdated?.(data);
+    } catch (err) {
+      console.error("Failed to audit ledger:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSimulateTamper = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/verifier/batches/batch_demo_alpha/simulate-tamper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tamperedAmount: 999999 }),
+      });
+      const data = await res.json();
+      setLastReport({ action: "TAMPER_ATTACK_SIMULATED", ...data });
+      onBatchesUpdated?.(data);
+    } catch (err) {
+      console.error("Failed to simulate tamper attack:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/verifier/batches/batch_demo_alpha/restore", {
+        method: "POST",
+      });
+      const data = await res.json();
+      setLastReport({ action: "BATCH_RESTORED", ...data });
+      onBatchesUpdated?.(data);
+    } catch (err) {
+      console.error("Failed to restore batch:", err);
     } finally {
       setLoading(false);
     }
@@ -74,41 +122,93 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
         }}
       >
         <div>
-          <h3 style={{ margin: 0, fontSize: "16px" }}>Real-World Ingestion & Agent Webhook Pipeline</h3>
+          <h3 style={{ margin: 0, fontSize: "16px" }}>
+            Real-World Ingestion, SHA-256 Attestation & Live Tamper Demo
+          </h3>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#94a3b8" }}>
-            Ingest messy OCR files from <code>data/invoices/</code> or simulate an external autonomous purchasing agent.
+            Ingest messy OCR files, audit the SHA-256 receipt chain, or simulate a live database tampering attack.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <button
             onClick={handleScanDirectory}
             disabled={loading}
             style={{
-              padding: "8px 14px",
+              padding: "7px 12px",
               borderRadius: "6px",
               background: "#2563eb",
               color: "#fff",
               border: "none",
               cursor: "pointer",
               fontWeight: 600,
+              fontSize: "12px",
             }}
           >
-            {loading ? "Processing..." : "Scan data/invoices/"}
+            {loading ? "..." : "Scan Invoices"}
           </button>
           <button
             onClick={handleSimulateWebhook}
             disabled={loading}
             style={{
-              padding: "8px 14px",
+              padding: "7px 12px",
               borderRadius: "6px",
               background: "#059669",
               color: "#fff",
               border: "none",
               cursor: "pointer",
               fontWeight: 600,
+              fontSize: "12px",
             }}
           >
-            Simulate Agent Webhook
+            Agent Webhook
+          </button>
+          <button
+            onClick={handleAuditLedger}
+            disabled={loading}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: "#7c3aed",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            Audit Receipts
+          </button>
+          <button
+            onClick={handleSimulateTamper}
+            disabled={loading}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: "#dc2626",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            Simulate Attack
+          </button>
+          <button
+            onClick={handleRestore}
+            disabled={loading}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: "#475569",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            Restore Clean
           </button>
         </div>
       </div>
@@ -122,7 +222,16 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
             borderRadius: "6px",
             fontSize: "12px",
             overflowX: "auto",
-            color: "#38bdf8",
+            color:
+              lastReport.overallStatus === "COMPROMISED" ||
+              lastReport.valid === false ||
+              lastReport.verificationStatus === "REJECTED_HALLUCINATION"
+                ? "#f87171"
+                : "#38bdf8",
+            border:
+              lastReport.overallStatus === "COMPROMISED" || lastReport.valid === false
+                ? "1px solid #ef4444"
+                : "1px solid #1e293b",
           }}
         >
           {JSON.stringify(lastReport, null, 2)}
