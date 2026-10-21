@@ -1,5 +1,10 @@
 import { batchStore, type BatchRecord, BatchStore } from "../store/batchStore.js";
-import { computePayloadHash, type AttestationPayload } from "./attestation.js";
+import {
+  computePayloadHash,
+  computePayloadDigest,
+  verifySignature,
+  type AttestationPayload,
+} from "./attestation.js";
 
 export interface BatchAuditResult {
   batchId: string;
@@ -19,6 +24,30 @@ export interface SystemAuditReport {
   overallStatus: "HEALTHY" | "COMPROMISED";
   auditedAt: string;
   results: BatchAuditResult[];
+}
+
+export function runLedgerAudit(store: BatchStore = batchStore) {
+  const batches = store.getAllBatches();
+  const results = batches.map((b) => {
+    const computedHash = computePayloadDigest(b.payload);
+    const hashMatches = computedHash === b.receipt.expectedHash;
+    const sigValid = verifySignature(b.id, computedHash, b.receipt.signature);
+
+    return {
+      batchId: b.id,
+      receiptId: b.receipt.receiptId,
+      expectedHash: b.receipt.expectedHash,
+      computedHash,
+      status: hashMatches && sigValid ? ("VALID" as const) : ("TAMPERED" as const),
+    };
+  });
+
+  const isHealthy = results.every((r) => r.status === "VALID");
+  return {
+    ledgerStatus: isHealthy ? ("HEALTHY" as const) : ("COMPROMISED" as const),
+    totalChecked: results.length,
+    results,
+  };
 }
 
 export class AuditService {

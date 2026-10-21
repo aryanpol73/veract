@@ -25,6 +25,7 @@ export interface BatchRecord {
 export class BatchStore {
   private batches = new Map<string, BatchRecord>();
   private receiptIndex = new Map<string, string>(); // receiptId -> batchId
+  private snapshots = new Map<string, string>(); // batchId -> raw snapshot
 
   /**
    * Creates a new batch in PENDING state.
@@ -153,6 +154,133 @@ export class BatchStore {
     };
 
     return verifyAttestation(currentPayload, batch.attestation);
+  }
+
+  /**
+   * Alias helper to retrieve a batch by receiptId.
+   */
+  getByReceipt(receiptId: string): (BatchRecord & { id: string; payload: Record<string, any>; receipt: any }) | undefined {
+    const b = this.getBatchByReceiptId(receiptId);
+    if (!b) return undefined;
+    return {
+      ...b,
+      id: b.batchId,
+      payload: {
+        batchId: b.batchId,
+        merchantId: b.merchantId,
+        totalAmount: b.totalAmount,
+        currency: b.currency,
+        transactionIds: b.transactionIds,
+        settledAt: b.settledAt,
+        metadata: b.metadata,
+      },
+      receipt: {
+        receiptId: b.receiptId || (b.attestation?.receiptId ?? `rcpt_${b.batchId}`),
+        batchId: b.batchId,
+        expectedHash: b.attestation?.payloadHash || "",
+        signature: b.attestation?.signature || "",
+        timestamp: b.settledAt || b.createdAt,
+      },
+    };
+  }
+
+  /**
+   * Returns all batches formatted with id, payload, and receipt.
+   */
+  getAllBatches(): Array<BatchRecord & { id: string; payload: Record<string, any>; receipt: { receiptId: string; batchId: string; expectedHash: string; signature: string; timestamp: string } }> {
+    return Array.from(this.batches.values()).map((b) => ({
+      ...b,
+      id: b.batchId,
+      payload: {
+        batchId: b.batchId,
+        merchantId: b.merchantId,
+        totalAmount: b.totalAmount,
+        currency: b.currency,
+        transactionIds: b.transactionIds,
+        settledAt: b.settledAt,
+        metadata: b.metadata,
+      },
+      receipt: {
+        receiptId: b.receiptId || (b.attestation?.receiptId ?? `rcpt_${b.batchId}`),
+        batchId: b.batchId,
+        expectedHash: b.attestation?.payloadHash || "",
+        signature: b.attestation?.signature || "",
+        timestamp: b.settledAt || b.createdAt,
+      },
+    }));
+  }
+
+  /**
+   * Adds or registers a batch directly with an attested payload.
+   */
+  addBatch(id: string, payload: Record<string, any>): BatchRecord & { id: string; payload: Record<string, any>; receipt: any } {
+    const totalAmount =
+      typeof payload.totalAmount === "number"
+        ? payload.totalAmount
+        : typeof payload.amount === "number"
+          ? payload.amount
+          : 1000;
+    const currency = typeof payload.currency === "string" ? payload.currency : "USD";
+    const transactionIds = Array.isArray(payload.transactionIds)
+      ? payload.transactionIds
+      : Array.isArray(payload.transactions)
+        ? payload.transactions
+        : [`tx_${id}`];
+
+    this.createBatch({
+      batchId: id,
+      merchantId: payload.merchantId || "merch_veract",
+      totalAmount,
+      currency,
+      transactionIds,
+      metadata: payload,
+    });
+
+    const settled = this.settleBatch(id, payload.settledAt || new Date().toISOString());
+    return {
+      ...settled,
+      id,
+      payload,
+      receipt: {
+        receiptId: settled.receiptId || `rcpt_${id}`,
+        batchId: id,
+        expectedHash: settled.attestation?.payloadHash || "",
+        signature: settled.attestation?.signature || "",
+        timestamp: settled.settledAt || settled.createdAt,
+      },
+    };
+  }
+
+  /**
+   * Non-destructive state simulation for audit demonstration.
+   */
+  simulateTamper(id: string, mutatedPayload: Record<string, any>): void {
+    const record = this.batches.get(id);
+    if (!record) throw new Error(`Batch not found: ${id}`);
+    if (!this.snapshots.has(id)) {
+      this.snapshots.set(id, JSON.stringify(record));
+    }
+    if (typeof mutatedPayload.amount === "number") {
+      record.totalAmount = mutatedPayload.amount;
+    } else if (typeof mutatedPayload.totalAmount === "number") {
+      record.totalAmount = mutatedPayload.totalAmount;
+    } else {
+      record.totalAmount += 50000;
+    }
+    if (mutatedPayload.corrupted) {
+      record.metadata = { ...record.metadata, corrupted: true };
+    }
+  }
+
+  /**
+   * Restores all snapshots back to their clean original states.
+   */
+  restoreAll(): void {
+    for (const [id, raw] of this.snapshots.entries()) {
+      const record = JSON.parse(raw);
+      this.batches.set(id, record);
+    }
+    this.snapshots.clear();
   }
 
   /**

@@ -1,19 +1,23 @@
 import React, { useState } from "react";
 
 interface IngestionToolbarProps {
+  sampleBatchId?: string;
   onBatchesUpdated?: (result: any) => void;
 }
 
-export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpdated }) => {
+export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({
+  sampleBatchId = "batch_demo_alpha",
+  onBatchesUpdated,
+}) => {
   const [loading, setLoading] = useState(false);
-  const [lastReport, setLastReport] = useState<any | null>(null);
+  const [auditState, setAuditState] = useState<any | null>(null);
 
   const handleScanDirectory = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/batches/scan-local", { method: "POST" });
       const data = await res.json();
-      setLastReport({ action: "SCAN_LOCAL", ...data });
+      setAuditState({ action: "SCAN_LOCAL", ...data });
       onBatchesUpdated?.(data);
     } catch (err) {
       console.error("Failed to scan local directory:", err);
@@ -44,7 +48,7 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
         }),
       });
       const data = await res.json();
-      setLastReport({ action: "AGENT_WEBHOOK", ...data });
+      setAuditState({ action: "AGENT_WEBHOOK", ...data });
       onBatchesUpdated?.(data);
     } catch (err) {
       console.error("Failed to trigger agent webhook:", err);
@@ -53,34 +57,32 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
     }
   };
 
-  const handleAuditLedger = async () => {
+  const handleAudit = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/verifier/audit");
       const data = await res.json();
-      setLastReport({ action: "CRYPTO_AUDIT_REPORT", ...data });
+      setAuditState(data);
       onBatchesUpdated?.(data);
     } catch (err) {
-      console.error("Failed to audit ledger:", err);
+      console.error("Failed to run ledger audit:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSimulateTamper = async () => {
+  const handleSimulateMismatch = async () => {
+    if (!sampleBatchId) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/verifier/batches/batch_demo_alpha/simulate-tamper", {
+      await fetch(`/api/verifier/simulate-tamper/${sampleBatchId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tamperedAmount: 999999 }),
+        body: JSON.stringify({ amount: 9999999 }),
       });
-      const data = await res.json();
-      setLastReport({ action: "TAMPER_ATTACK_SIMULATED", ...data });
-      onBatchesUpdated?.(data);
+      await handleAudit();
     } catch (err) {
-      console.error("Failed to simulate tamper attack:", err);
-    } finally {
+      console.error("Failed to simulate state mismatch:", err);
       setLoading(false);
     }
   };
@@ -88,18 +90,35 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
   const handleRestore = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/verifier/batches/batch_demo_alpha/restore", {
-        method: "POST",
-      });
+      const res = await fetch("/api/verifier/restore", { method: "POST" });
       const data = await res.json();
-      setLastReport({ action: "BATCH_RESTORED", ...data });
+      setAuditState(data.audit ?? data);
       onBatchesUpdated?.(data);
     } catch (err) {
-      console.error("Failed to restore batch:", err);
+      console.error("Failed to restore ledger:", err);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleExportMerkleRoot = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/verifier/merkle-anchor");
+      const data = await res.json();
+      setAuditState({ action: "MERKLE_ROOT_ANCHOR_SNAPSHOT", ...data });
+      onBatchesUpdated?.(data);
+    } catch (err) {
+      console.error("Failed to export Merkle anchor:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isHealthy =
+    auditState?.ledgerStatus === "HEALTHY" || auditState?.overallStatus === "HEALTHY";
+  const isCompromised =
+    auditState?.ledgerStatus === "COMPROMISED" || auditState?.overallStatus === "COMPROMISED";
 
   return (
     <div
@@ -123,15 +142,15 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
       >
         <div>
           <h3 style={{ margin: 0, fontSize: "16px" }}>
-            Real-World Ingestion, SHA-256 Attestation & Live Tamper Demo
+            Phase 5/6: Cryptographic Attestation, Merkle Anchoring & Tamper Proofs
           </h3>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#94a3b8" }}>
-            Ingest messy OCR files, audit the SHA-256 receipt chain, or simulate a live database tampering attack.
+            Audit SHA-256 receipts, export Merkle root checkpoints, or simulate an in-memory tampering attack live.
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <button
-            onClick={handleScanDirectory}
+            onClick={handleAudit}
             disabled={loading}
             style={{
               padding: "7px 12px",
@@ -144,7 +163,71 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
               fontSize: "12px",
             }}
           >
-            {loading ? "..." : "Scan Invoices"}
+            {loading ? "..." : "Run Live Audit"}
+          </button>
+          <button
+            onClick={handleSimulateMismatch}
+            disabled={loading || !sampleBatchId}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: "#dc2626",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            Simulate State Mismatch
+          </button>
+          <button
+            onClick={handleRestore}
+            disabled={loading}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: "#475569",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            Restore Snapshot
+          </button>
+          <button
+            onClick={handleExportMerkleRoot}
+            disabled={loading}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: "#7c3aed",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            Export Merkle Root
+          </button>
+          <button
+            onClick={handleScanDirectory}
+            disabled={loading}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: "#0891b2",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            Scan Invoices
           </button>
           <button
             onClick={handleSimulateWebhook}
@@ -162,80 +245,56 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({ onBatchesUpd
           >
             Agent Webhook
           </button>
-          <button
-            onClick={handleAuditLedger}
-            disabled={loading}
-            style={{
-              padding: "7px 12px",
-              borderRadius: "6px",
-              background: "#7c3aed",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              fontSize: "12px",
-            }}
-          >
-            Audit Receipts
-          </button>
-          <button
-            onClick={handleSimulateTamper}
-            disabled={loading}
-            style={{
-              padding: "7px 12px",
-              borderRadius: "6px",
-              background: "#dc2626",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              fontSize: "12px",
-            }}
-          >
-            Simulate Attack
-          </button>
-          <button
-            onClick={handleRestore}
-            disabled={loading}
-            style={{
-              padding: "7px 12px",
-              borderRadius: "6px",
-              background: "#475569",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              fontSize: "12px",
-            }}
-          >
-            Restore Clean
-          </button>
         </div>
       </div>
 
-      {lastReport && (
-        <pre
-          style={{
-            marginTop: "12px",
-            padding: "12px",
-            background: "#020617",
-            borderRadius: "6px",
-            fontSize: "12px",
-            overflowX: "auto",
-            color:
-              lastReport.overallStatus === "COMPROMISED" ||
-              lastReport.valid === false ||
-              lastReport.verificationStatus === "REJECTED_HALLUCINATION"
-                ? "#f87171"
-                : "#38bdf8",
-            border:
-              lastReport.overallStatus === "COMPROMISED" || lastReport.valid === false
-                ? "1px solid #ef4444"
-                : "1px solid #1e293b",
-          }}
-        >
-          {JSON.stringify(lastReport, null, 2)}
-        </pre>
+      {auditState && (
+        <div style={{ marginTop: "12px" }}>
+          {(isHealthy || isCompromised) && (
+            <div
+              style={{
+                marginBottom: "8px",
+                fontWeight: "bold",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <span>Ledger Audit Status:</span>
+              <span
+                style={{
+                  color: isHealthy ? "#34d399" : "#f87171",
+                  background: isHealthy ? "rgba(52, 211, 153, 0.15)" : "rgba(248, 113, 113, 0.15)",
+                  border: isHealthy ? "1px solid #34d399" : "1px solid #f87171",
+                  padding: "2px 8px",
+                  borderRadius: "4px",
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                }}
+              >
+                {isHealthy ? "HEALTHY" : "COMPROMISED"}
+              </span>
+              <span style={{ color: "#94a3b8", fontSize: "12px" }}>
+                ({auditState.totalChecked ?? auditState.totalSettledBatches ?? 0} batches verified)
+              </span>
+            </div>
+          )}
+
+          <pre
+            style={{
+              padding: "12px",
+              background: "#020617",
+              borderRadius: "6px",
+              fontSize: "12px",
+              overflowX: "auto",
+              color: isCompromised ? "#f87171" : "#38bdf8",
+              border: isCompromised ? "1px solid #ef4444" : "1px solid #1e293b",
+            }}
+          >
+            {JSON.stringify(auditState, null, 2)}
+          </pre>
+        </div>
       )}
     </div>
   );

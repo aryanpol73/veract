@@ -1,6 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import { batchStore } from "../store/batchStore.js";
-import { auditService } from "../verifier/auditService.js";
+import { auditService, runLedgerAudit } from "../verifier/auditService.js";
+import {
+  generateAnchorSnapshot,
+  generateMerkleProof,
+  verifyMerkleProof,
+} from "../verifier/merkleAnchor.js";
 
 export const attestationRouter = Router();
 
@@ -32,9 +37,13 @@ if (batchStore.getSettledBatches().length === 0) {
  * Runs a full cryptographic audit across all settled batches.
  */
 attestationRouter.get("/audit", (_req: Request, res: Response) => {
+  const ledger = runLedgerAudit();
   const report = auditService.auditAllSettledBatches();
   const statusCode = report.overallStatus === "HEALTHY" ? 200 : 409;
-  return res.status(statusCode).json(report);
+  return res.status(statusCode).json({
+    ...ledger,
+    ...report,
+  });
 });
 
 /**
@@ -53,66 +62,120 @@ attestationRouter.get("/batches/:batchId/verify", (req: Request, res: Response) 
 });
 
 /**
- * GET /api/verifier/receipts/:receiptId
+ * GET /api/verifier/receipts/:receiptId AND GET /api/verifier/receipt/:receiptId
  * Looks up a batch and its cryptographic proof directly by receiptId.
  */
-attestationRouter.get("/receipts/:receiptId", (req: Request, res: Response) => {
+const handleReceiptLookup = (req: Request, res: Response) => {
   const receiptId = String(req.params.receiptId);
-  const batch = batchStore.getBatchByReceiptId(receiptId);
+  const record = batchStore.getByReceipt(receiptId);
 
-  if (!batch) {
+  if (!record) {
     return res.status(404).json({
       error: "RECEIPT_NOT_FOUND",
       message: `No settled batch found for receiptId: ${receiptId}`,
     });
   }
 
-  const audit = auditService.auditBatch(batch.batchId);
+  const audit = auditService.auditBatch(record.id);
 
   return res.status(200).json({
-    receipt: batch.attestation,
+    ...record,
+    receipt: record.attestation ?? record.receipt,
     batch: {
-      batchId: batch.batchId,
-      merchantId: batch.merchantId,
-      totalAmount: batch.totalAmount,
-      currency: batch.currency,
-      transactionCount: batch.transactionIds.length,
-      settledAt: batch.settledAt,
+      batchId: record.batchId,
+      merchantId: record.merchantId,
+      totalAmount: record.totalAmount,
+      currency: record.currency,
+      transactionCount: record.transactionIds.length,
+      settledAt: record.settledAt,
     },
     verification: audit,
   });
-});
+};
+
+attestationRouter.get("/receipts/:receiptId", handleReceiptLookup);
+attestationRouter.get("/receipt/:receiptId", handleReceiptLookup);
 
 /**
- * POST /api/verifier/batches/:batchId/simulate-tamper
+ * POST /api/verifier/batches/:batchId/simulate-tamper AND /simulate-tamper/:batchId
  * Live Hackathon Demo Endpoint: Mutates in-memory batch state to demonstrate
  * real-time SHA-256 tamper detection.
  */
-attestationRouter.post("/batches/:batchId/simulate-tamper", (req: Request, res: Response) => {
+const handleSimulateTamper = (req: Request, res: Response) => {
   try {
     const batchId = String(req.params.batchId);
-    const { tamperedAmount, injectedTransactionId } = req.body || {};
+    const { tamperedAmount, amount, injectedTransactionId } = req.body || {};
 
     const outcome = auditService.simulateTamperAttack(batchId, {
-      tamperedAmount,
+      tamperedAmount: typeof tamperedAmount === "number" ? tamperedAmount : amount,
       injectedTransactionId,
     });
 
-    return res.status(200).json(outcome);
+    return res.status(200).json({
+      status: "MUTATION_APPLIED",
+      ...outcome,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Tamper simulation failed";
     return res.status(400).json({ error: "SIMULATION_ERROR", message });
   }
-});
+};
+
+attestationRouter.post("/batches/:batchId/simulate-tamper", handleSimulateTamper);
+attestationRouter.post("/simulate-tamper/:batchId", handleSimulateTamper);
 
 /**
- * POST /api/verifier/batches/:batchId/restore
- * Restores a tampered demo batch back to its original valid state.
+ * POST /api/verifier/batches/:batchId/restore AND /restore
+ * Restores demo batches back to their original valid state.
  */
-attestationRouter.post("/batches/:batchId/restore", (req: Request, res: Response) => {
+const handleRestoreAll = (req: Request, res: Response) => {
+  const batchId = req.params.batchId ? String(req.params.batchId) : undefined;
+  if (batchId) {
+    const restored = auditService.restoreTamperedBatch(batchId);
+    return res.status(200).json(restored);
+  }
+  batchStore.restoreAll();
+  const audit = runLedgerAudit();
+  return res.status(200).json({ status: "LEDGER_RESTORED", audit });
+};
+
+attestationRouter.post("/batches/:batchId/restore", handleRestoreAll);
+attestationRouter.post("/restore", handleRestoreAll);
+
+/**
+ * Phase 6 Endpoints: Merkle Tree Checkpoint & Inclusion Proof Export
+ */
+attestationRouter.get("/anchor", (_req: Request, res: Response) => {
+  const snapshot = generateAnchorSnapshot();
+  return res.status(200).json(snapshot);
+});
+
+attestationRouter.get("/merkle-anchor", (_req: Request, res: Response) => {
+  const snapshot = generateAnchorSnapshot();
+  return res.status(200).json(snapshot);
+});
+
+attestationRouter.get("/batches/:batchId/merkle-proof", (req: Request, res: Response) => {
   const batchId = String(req.params.batchId);
-  const restoredAudit = auditService.restoreTamperedBatch(batchId);
-  return res.status(200).json(restoredAudit);
+  const batches = batchStore.getAllBatches();
+  const targetIndex = batches.findIndex((b) => b.id === batchId);
+
+  if (targetIndex === -1) {
+    return res.status(404).json({ error: "BATCH_NOT_FOUND", batchId });
+  }
+
+  const leaves = batches.map((b) => b.receipt.expectedHash);
+  const proof = generateMerkleProof(leaves, targetIndex);
+  if (!proof) {
+    return res.status(500).json({ error: "PROOF_GENERATION_FAILED" });
+  }
+
+  const verified = verifyMerkleProof(proof.root, proof.leaf, proof.proof);
+  return res.status(200).json({
+    batchId,
+    verified,
+    ...proof,
+  });
 });
 
 export default attestationRouter;

@@ -47,14 +47,44 @@ export function canonicalize(value: unknown): string {
 /**
  * Computes a deterministic SHA-256 hex digest of any payload.
  */
-export function computePayloadHash(payload: AttestationPayload): string {
-  const normalizedPayload: AttestationPayload = {
-    ...payload,
-    // Sort transaction IDs to avoid false tamper positives from array ordering
-    transactionIds: [...payload.transactionIds].sort(),
-  };
-  const canonicalJson = canonicalize(normalizedPayload);
+export function computePayloadDigest(payload: any): string {
+  if (payload && Array.isArray(payload.transactionIds)) {
+    payload = {
+      ...payload,
+      transactionIds: [...payload.transactionIds].sort(),
+    };
+  }
+  const canonicalJson = canonicalize(payload);
   return crypto.createHash("sha256").update(canonicalJson, "utf8").digest("hex");
+}
+
+export function computePayloadHash(payload: AttestationPayload): string {
+  return computePayloadDigest(payload);
+}
+
+export function generateReceipt(batchId: string, payloadDigest: string) {
+  const hmac = crypto
+    .createHmac("sha256", ATTESTATION_SECRET)
+    .update(`${batchId}:${payloadDigest}`)
+    .digest("hex");
+  return {
+    receiptId: `rcpt_${payloadDigest.slice(0, 12)}`,
+    batchId,
+    expectedHash: payloadDigest,
+    signature: hmac,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+export function verifySignature(batchId: string, digest: string, signature: string): boolean {
+  const expectedHmac = crypto
+    .createHmac("sha256", ATTESTATION_SECRET)
+    .update(`${batchId}:${digest}`)
+    .digest("hex");
+  const bufA = Buffer.from(signature, "hex");
+  const bufB = Buffer.from(expectedHmac, "hex");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 /**
