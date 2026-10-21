@@ -5,22 +5,39 @@
   "description": "Pre-Authorized Outcome-Metered Settlement Engine for AI Workers via PayPal",
   "scripts": {
     "test": "vitest run",
-    "build": "tsc",
+    "build": "vite build",
+    "start": "tsx src/server/index.ts",
+    "dev:server": "tsx src/server/index.ts",
+    "dev:client": "vite",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "verify:sandbox": "tsx scripts/verify-paypal-sandbox.ts",
-    "verify:paypal": "tsx scripts/verify-paypal-sandbox.ts"
+    "verify:paypal": "tsx scripts/verify-paypal-sandbox.ts",
+    "verify:engine": "tsx scripts/verify-phase2-engine.ts",
+    "verify:api": "tsx scripts/verify-phase3-api.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.10.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
+    "vite": "^8.3.4",
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "ag-grid-community": "^36.2.0",
+    "ag-grid-react": "^36.2.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
+    "framer-motion": "^14.4.0",
+    "lucide-react": "^1.60.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "zod": "^4.6.7"
   }
 }

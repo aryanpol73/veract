@@ -146,6 +146,17 @@ export interface VoidAuthorizationResult {
   requestId: string;
 }
 
+export interface GetCaptureResult {
+  captureId: string;
+  status: string;
+  capturedCents: number;
+  customId: string | undefined;
+  invoiceId: string | undefined;
+  finalCapture: boolean | undefined;
+  createTime: string | undefined;
+  raw: unknown;
+}
+
 // ---------- Helpers ----------
 
 /** Builds "VERACT:<batchId_12chars>:<sha256_hex>" (85 chars, hard-capped at 127). */
@@ -471,5 +482,25 @@ export class PayPalClient {
       { requestId },
     );
     return { authorizationId, status: result?.status ?? "VOIDED", requestId };
+  }
+
+  async getCaptureDetails(captureId: string): Promise<GetCaptureResult> {
+    assertNonEmptyId(captureId, "captureId");
+    const result = await this.request<
+      PayPalCaptureResponse & { invoice_id?: string; create_time?: string }
+    >("GET", `/v2/payments/captures/${encodeURIComponent(captureId)}`);
+    if (!result?.id) {
+      throw new Error(`PayPal GET capture ${captureId} returned no id`);
+    }
+    return {
+      captureId: result.id,
+      status: result.status,
+      capturedCents: result.amount ? usdStringToCents(result.amount.value) : 0,
+      customId: result.custom_id,
+      invoiceId: result.invoice_id,
+      finalCapture: result.final_capture,
+      createTime: result.create_time,
+      raw: result,
+    };
   }
 }
