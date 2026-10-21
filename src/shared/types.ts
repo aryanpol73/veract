@@ -31,7 +31,8 @@ export interface Gate1Report {
 export type Gate2FailureCode =
   | "QUOTE_TOO_SHORT"
   | "SUBSTRING_NOT_FOUND"
-  | "MISSING_TOTAL_ANCHOR";
+  | "MISSING_TOTAL_ANCHOR"
+  | "VENDOR_GROUNDING_FAILED";
 
 export interface Gate2Report {
   readonly passed: boolean;
@@ -41,6 +42,14 @@ export interface Gate2Report {
   readonly containsTotalAnchor: boolean;
   readonly expectedAnchors: readonly string[];
   readonly failureCode?: Gate2FailureCode;
+  readonly matchType?: "EXACT" | "FUZZY_OCR" | "NONE";
+  readonly similarity?: number;
+  readonly vendorGrounding?: {
+    readonly matched: boolean;
+    readonly matchType: "EXACT" | "FUZZY_OCR" | "NONE";
+    readonly matchedSpan: string | null;
+    readonly similarity: number;
+  };
 }
 
 export interface Gate3Report {

@@ -1,0 +1,14 @@
+{
+  "rawText": "INVOICE # 884-B \n VENDOR: Gl0bal Tech Solut1ons LLC \n Date: Oct 14, '26 \n ----------------------------- \n ITEM | QTY | RATE | TOTAL \n Cloud Compute Node (x4) | 2 | $1,200.00 | $2,400.00 \n Support Tier - Gold | 1 | 450.00 USD | $450.00 \n ----------------------------- \n SUBTOTAL: $2,850.00 \n TAX (8%): $228.00 \n TOTAL DUE: $3,078.00 \n Payment Terms: Net-30. Remit via PayPal Auth.",
+  "extractedPayload": {
+    "invoiceNumber": "884-B",
+    "vendorName": "Global Tech Solutions LLC",
+    "issueDate": "2026-10-14",
+    "currency": "USD",
+    "totalAmount": 3078.00,
+    "lineItems": [
+      { "description": "Cloud Compute Node (x4)", "quantity": 2, "total": 2400.00 },
+      { "description": "Support Tier - Gold", "quantity": 1, "total": 450.00 }
+    ]
+  }
+}

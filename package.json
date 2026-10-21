@@ -13,7 +13,8 @@
     "verify:sandbox": "tsx scripts/verify-paypal-sandbox.ts",
     "verify:paypal": "tsx scripts/verify-paypal-sandbox.ts",
     "verify:engine": "tsx scripts/verify-phase2-engine.ts",
-    "verify:api": "tsx scripts/verify-phase3-api.ts"
+    "verify:api": "tsx scripts/verify-phase3-api.ts",
+    "verify:ingest": "tsx scripts/verify-ingestion-pipeline.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

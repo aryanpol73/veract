@@ -3,6 +3,7 @@
 import { centsToUsdString, computeSettlement } from "../../shared/money.js";
 import { computeCanonicalSha256 } from "../../shared/canonicalHash.js";
 import { buildVeractCustomId } from "../paypal/paypalClient.js";
+import { groundSpanWithFuzzyFallback } from "./fuzzyMatch.js";
 import type {
   BatchVerificationSummary,
   CandidateExtraction,
@@ -105,7 +106,8 @@ export function evaluateGate1(candidate: CandidateExtraction): Gate1Report {
 
 /**
  * Gate 2: Canonical Span-Offset Grounding & Dollar Anchor Verification.
- * Proves the LLM quote exists verbatim in the source document and anchors the stated total.
+ * Proves the LLM quote exists in the source document (exact or fuzzy OCR match >= 80%),
+ * verifies vendor name grounding (fuzzy threshold >= 82%), and anchors the stated total.
  */
 export function evaluateGate2(
   sourceDocument: string,
@@ -118,6 +120,18 @@ export function evaluateGate2(
       ? buildDollarAnchors(candidate.statedTotalCents)
       : [];
 
+  // Ground vendor name if provided
+  let vendorGrounding: Gate2Report["vendorGrounding"] | undefined;
+  if (candidate.vendorName && candidate.vendorName.trim().length >= 2) {
+    const vg = groundSpanWithFuzzyFallback(normSource, candidate.vendorName, 0.82);
+    vendorGrounding = {
+      matched: vg.matched,
+      matchType: vg.matchType,
+      matchedSpan: vg.matchedSpan,
+      similarity: vg.similarity,
+    };
+  }
+
   if (normQuote.length < MIN_QUOTE_CHARS) {
     return {
       passed: false,
@@ -127,24 +141,44 @@ export function evaluateGate2(
       containsTotalAnchor: false,
       expectedAnchors,
       failureCode: "QUOTE_TOO_SHORT",
+      matchType: "NONE",
+      vendorGrounding,
     };
   }
 
-  const startOffset = normSource.indexOf(normQuote);
+  let startOffset = normSource.indexOf(normQuote);
+  let matchType: "EXACT" | "FUZZY_OCR" | "NONE" = "EXACT";
+  let similarity = 1.0;
+  let matchedSpan = normQuote;
+
   if (startOffset === -1) {
-    return {
-      passed: false,
-      startOffset: -1,
-      endOffset: -1,
-      normalizedQuote: normQuote,
-      containsTotalAnchor: false,
-      expectedAnchors,
-      failureCode: "SUBSTRING_NOT_FOUND",
-    };
+    // Fallback: Sliding window fuzzy OCR matching for quote
+    const fuzzyMatch = groundSpanWithFuzzyFallback(normSource, normQuote, 0.8);
+    if (fuzzyMatch.matched && fuzzyMatch.matchedSpan) {
+      startOffset = normSource.indexOf(fuzzyMatch.matchedSpan);
+      matchType = "FUZZY_OCR";
+      similarity = fuzzyMatch.similarity;
+      matchedSpan = fuzzyMatch.matchedSpan;
+    } else {
+      return {
+        passed: false,
+        startOffset: -1,
+        endOffset: -1,
+        normalizedQuote: normQuote,
+        containsTotalAnchor: false,
+        expectedAnchors,
+        failureCode: "SUBSTRING_NOT_FOUND",
+        matchType: "NONE",
+        similarity: fuzzyMatch.similarity,
+        vendorGrounding,
+      };
+    }
   }
 
-  const endOffset = startOffset + normQuote.length;
-  const containsTotalAnchor = expectedAnchors.some((anchor) => normQuote.includes(anchor));
+  const endOffset = startOffset + matchedSpan.length;
+  const containsTotalAnchor = expectedAnchors.some(
+    (anchor) => matchedSpan.includes(anchor) || normQuote.includes(anchor),
+  );
 
   if (!containsTotalAnchor) {
     return {
@@ -155,6 +189,25 @@ export function evaluateGate2(
       containsTotalAnchor: false,
       expectedAnchors,
       failureCode: "MISSING_TOTAL_ANCHOR",
+      matchType,
+      similarity,
+      vendorGrounding,
+    };
+  }
+
+  // Check vendor grounding result
+  if (vendorGrounding && !vendorGrounding.matched) {
+    return {
+      passed: false,
+      startOffset,
+      endOffset,
+      normalizedQuote: normQuote,
+      containsTotalAnchor: true,
+      expectedAnchors,
+      failureCode: "VENDOR_GROUNDING_FAILED",
+      matchType,
+      similarity: vendorGrounding.similarity,
+      vendorGrounding,
     };
   }
 
@@ -165,6 +218,9 @@ export function evaluateGate2(
     normalizedQuote: normQuote,
     containsTotalAnchor: true,
     expectedAnchors,
+    matchType,
+    similarity,
+    vendorGrounding,
   };
 }
 

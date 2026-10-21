@@ -1,0 +1,22 @@
+[
+  {
+    "batchId": "FebZB7cw2Ns8",
+    "state": "CREATED",
+    "orderId": "4LU31907MS992652W",
+    "approvalUrl": "https://www.sandbox.paypal.com/checkoutnow?token=4LU31907MS992652W",
+    "authorizedCents": 1000,
+    "paypalRequestId": "e452cf1d85d35ccc4eab5bd91762c5503124",
+    "createdAt": "2026-10-20T18:16:28.264Z",
+    "updatedAt": "2026-10-20T18:16:28.264Z"
+  },
+  {
+    "batchId": "cwoasx7jDHEd",
+    "state": "CREATED",
+    "orderId": "0JR51043A3511273Y",
+    "approvalUrl": "https://www.sandbox.paypal.com/checkoutnow?token=0JR51043A3511273Y",
+    "authorizedCents": 1000,
+    "paypalRequestId": "25187184753bf5aa42347b4ecda3648067f9",
+    "createdAt": "2026-10-20T18:16:43.043Z",
+    "updatedAt": "2026-10-20T18:16:43.043Z"
+  }
+]

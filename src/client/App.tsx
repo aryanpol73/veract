@@ -36,6 +36,7 @@ import type {
   TaskVerificationResult,
   VendorContractFixture,
 } from "../shared/types.js";
+import { IngestionToolbar } from "./components/IngestionToolbar.js";
 
 const veractGridTheme = themeQuartz.withParams({
   backgroundColor: "rgba(11, 18, 32, 0.75)",
@@ -743,6 +744,8 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <IngestionToolbar />
 
         {/* Top Row: 4 Animated Glass KPI Cards + Live PayPal Execution Console */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">

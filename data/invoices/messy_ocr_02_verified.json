@@ -1,0 +1,15 @@
+{
+  "rawText": "INVOICE # 902-A \n VENDOR: Gl0bal Tech Solut1ons LLC \n Date: Oct 20, '26 \n ----------------------------- \n ITEM | QTY | TOTAL \n Dedicated GPU Cluster | 1 | $1,500.00 \n Bandwidth Overage | 1 | $250.00 \n Sales Tax (8%) | 1 | $140.00 \n ----------------------------- \n TOTAL DUE: $1,890.00 \n Payment Terms: Net-15.",
+  "extractedPayload": {
+    "invoiceNumber": "902-A",
+    "vendorName": "Global Tech Solutions LLC",
+    "issueDate": "2026-10-20",
+    "currency": "USD",
+    "totalAmount": 1890.00,
+    "lineItems": [
+      { "description": "Dedicated GPU Cluster", "quantity": 1, "total": 1500.00 },
+      { "description": "Bandwidth Overage", "quantity": 1, "total": 250.00 },
+      { "description": "Sales Tax (8%)", "quantity": 1, "total": 140.00 }
+    ]
+  }
+}

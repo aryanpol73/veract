@@ -24,11 +24,13 @@ import { verifyTask } from "./verifier/veractVerifier.js";
 import { BatchStore, StateTransitionError, type ExecutionMode } from "./db/batchStore.js";
 import { runExtractionWorkerBatch } from "./worker/llmWorker.js";
 import type { BatchVerificationSummary } from "../shared/types.js";
+import ingestRouter from "../routes/ingest.js";
 
 export function createVeractApp(customStore?: BatchStore, customPayPal?: PayPalClient) {
   const app = express();
   app.use(cors());
   app.use(express.json());
+  app.use(ingestRouter);
 
   const store = customStore ?? new BatchStore();
 
