@@ -468,13 +468,19 @@ export function createVeractApp(customStore?: BatchStore, customPayPal?: PayPalC
     }
   });
 
-  // Serve compiled Vite frontend in production if dist/client exists
-  const clientDistIndex = resolve(process.cwd(), "dist", "client", "index.html");
-  if (existsSync(clientDistIndex)) {
-    const clientDistDir = resolve(process.cwd(), "dist", "client");
+  // Serve Vite production build
+  const clientDistDir = existsSync(resolve(process.cwd(), "dist", "client", "index.html"))
+    ? resolve(process.cwd(), "dist", "client")
+    : existsSync(resolve(process.cwd(), "dist", "index.html"))
+      ? resolve(process.cwd(), "dist")
+      : null;
+
+  if (clientDistDir) {
     app.use(express.static(clientDistDir));
-    app.get("/{*splat}", (_req: Request, res: Response) => {
-      res.sendFile(clientDistIndex);
+    // SPA Fallback: route all non-API GET requests to index.html (Express 5 safe)
+    app.use((req: Request, res: Response, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api")) return next();
+      res.sendFile(resolve(clientDistDir, "index.html"));
     });
   }
 
@@ -507,15 +513,16 @@ function handleApiError(err: unknown, res: Response): void {
   });
 }
 
-// Start server if invoked directly
+// Dynamic PORT assignment for Render / Railway
 const isDirectRun =
   process.argv[1] &&
-  (process.argv[1].endsWith("server/index.ts") || process.argv[1].endsWith("server\\index.ts"));
+  (process.argv[1].includes("server/index") || process.argv[1].includes("server\\index"));
 
 if (isDirectRun) {
-  const port = Number(process.env.PORT ?? 4000);
+  const PORT = Number(process.env.PORT) || 3000;
   const app = createVeractApp();
-  app.listen(port, () => {
-    console.log(`\n🚀 Veract Settlement Engine API listening on http://localhost:${port}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Veract Sentinel running on port ${PORT}`);
   });
 }
+
