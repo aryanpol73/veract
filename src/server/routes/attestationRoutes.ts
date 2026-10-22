@@ -6,6 +6,7 @@ import {
   generateMerkleProof,
   verifyMerkleProof,
 } from "../verifier/merkleAnchor.js";
+import { sentinelService } from "../verifier/sentinelService.js";
 
 export const attestationRouter = Router();
 
@@ -176,6 +177,32 @@ attestationRouter.get("/batches/:batchId/merkle-proof", (req: Request, res: Resp
     verified,
     ...proof,
   });
+});
+
+/**
+ * Phase 7 Endpoints: Autonomous Sentinel Watchtower & Compliance Certificate Export
+ */
+attestationRouter.post("/sentinel/scan", (_req: Request, res: Response) => {
+  res.json(sentinelService.executeWatchtowerScan());
+});
+
+attestationRouter.get("/sentinel/status", (_req: Request, res: Response) => {
+  res.json(sentinelService.getStatus());
+});
+
+attestationRouter.post("/sentinel/toggle-autoheal", (req: Request, res: Response) => {
+  const { enabled } = req.body || {};
+  sentinelService.setAutoHeal(Boolean(enabled));
+  res.json(sentinelService.getStatus());
+});
+
+attestationRouter.get("/batches/:batchId/certificate", (req: Request, res: Response) => {
+  try {
+    const cert = sentinelService.generateComplianceReport(String(req.params.batchId));
+    res.json(cert);
+  } catch (e: any) {
+    res.status(404).json({ error: e.message });
+  }
 });
 
 export default attestationRouter;

@@ -4,6 +4,8 @@ import {
   type AttestationReceipt,
   createAttestationReceipt,
   verifyAttestation,
+  computePayloadDigest,
+  generateReceipt,
 } from "../verifier/attestation.js";
 
 export type BatchStatus = "PENDING" | "PROCESSING" | "SETTLED" | "FAILED";
@@ -104,9 +106,33 @@ export class BatchStore {
   /**
    * Retrieves a batch by its ID.
    */
-  getBatch(batchId: string): BatchRecord | undefined {
+  getBatch(batchId: string): (BatchRecord & { id: string; payload?: Record<string, any>; receipt: { receiptId: string; batchId: string; expectedHash: string; signature: string; timestamp: string } }) | undefined {
     const batch = this.batches.get(batchId);
-    return batch ? { ...batch, transactionIds: [...batch.transactionIds] } : undefined;
+    if (!batch) return undefined;
+    const defaultPayload = {
+      batchId: batch.batchId,
+      merchantId: batch.merchantId,
+      totalAmount: batch.totalAmount,
+      currency: batch.currency,
+      transactionIds: batch.transactionIds,
+      settledAt: batch.settledAt,
+      metadata: batch.metadata,
+    };
+    const payload = (batch as any).payload ?? defaultPayload;
+    const receipt = (batch as any).receipt ?? {
+      receiptId: batch.receiptId || (batch.attestation?.receiptId ?? `rcpt_${batch.batchId}`),
+      batchId: batch.batchId,
+      expectedHash: batch.attestation?.payloadHash || computePayloadDigest(payload),
+      signature: batch.attestation?.signature || "",
+      timestamp: batch.settledAt || batch.createdAt,
+    };
+    return {
+      ...batch,
+      id: batch.batchId,
+      payload,
+      receipt,
+      transactionIds: [...batch.transactionIds],
+    };
   }
 
   /**
@@ -188,10 +214,8 @@ export class BatchStore {
    * Returns all batches formatted with id, payload, and receipt.
    */
   getAllBatches(): Array<BatchRecord & { id: string; payload: Record<string, any>; receipt: { receiptId: string; batchId: string; expectedHash: string; signature: string; timestamp: string } }> {
-    return Array.from(this.batches.values()).map((b) => ({
-      ...b,
-      id: b.batchId,
-      payload: {
+    return Array.from(this.batches.values()).map((b) => {
+      const defaultPayload = {
         batchId: b.batchId,
         merchantId: b.merchantId,
         totalAmount: b.totalAmount,
@@ -199,15 +223,22 @@ export class BatchStore {
         transactionIds: b.transactionIds,
         settledAt: b.settledAt,
         metadata: b.metadata,
-      },
-      receipt: {
+      };
+      const payload = (b as any).payload ?? defaultPayload;
+      const receipt = (b as any).receipt ?? {
         receiptId: b.receiptId || (b.attestation?.receiptId ?? `rcpt_${b.batchId}`),
         batchId: b.batchId,
-        expectedHash: b.attestation?.payloadHash || "",
+        expectedHash: b.attestation?.payloadHash || computePayloadDigest(payload),
         signature: b.attestation?.signature || "",
         timestamp: b.settledAt || b.createdAt,
-      },
-    }));
+      };
+      return {
+        ...b,
+        id: b.batchId,
+        payload,
+        receipt,
+      };
+    });
   }
 
   /**
@@ -219,7 +250,9 @@ export class BatchStore {
         ? payload.totalAmount
         : typeof payload.amount === "number"
           ? payload.amount
-          : 1000;
+          : typeof payload.total === "number"
+            ? payload.total
+            : 1000;
     const currency = typeof payload.currency === "string" ? payload.currency : "USD";
     const transactionIds = Array.isArray(payload.transactionIds)
       ? payload.transactionIds
@@ -237,18 +270,18 @@ export class BatchStore {
     });
 
     const settled = this.settleBatch(id, payload.settledAt || new Date().toISOString());
-    return {
+    const digest = computePayloadDigest(payload);
+    const receipt = generateReceipt(id, digest);
+
+    const fullRecord = {
       ...settled,
       id,
-      payload,
-      receipt: {
-        receiptId: settled.receiptId || `rcpt_${id}`,
-        batchId: id,
-        expectedHash: settled.attestation?.payloadHash || "",
-        signature: settled.attestation?.signature || "",
-        timestamp: settled.settledAt || settled.createdAt,
-      },
+      payload: { ...payload },
+      receipt,
     };
+    this.batches.set(id, fullRecord);
+    this.receiptIndex.set(receipt.receiptId, id);
+    return fullRecord;
   }
 
   /**
@@ -258,12 +291,16 @@ export class BatchStore {
     const record = this.batches.get(id);
     if (!record) throw new Error(`Batch not found: ${id}`);
     if (!this.snapshots.has(id)) {
-      this.snapshots.set(id, JSON.stringify(record));
+      const originalPayload = (record as any).payload ?? { ...record };
+      this.snapshots.set(id, JSON.stringify(originalPayload));
     }
+    (record as any).payload = { ...mutatedPayload };
     if (typeof mutatedPayload.amount === "number") {
       record.totalAmount = mutatedPayload.amount;
     } else if (typeof mutatedPayload.totalAmount === "number") {
       record.totalAmount = mutatedPayload.totalAmount;
+    } else if (typeof mutatedPayload.total === "number") {
+      record.totalAmount = mutatedPayload.total;
     } else {
       record.totalAmount += 50000;
     }
@@ -277,8 +314,14 @@ export class BatchStore {
    */
   restoreAll(): void {
     for (const [id, raw] of this.snapshots.entries()) {
-      const record = JSON.parse(raw);
-      this.batches.set(id, record);
+      const parsed = JSON.parse(raw);
+      const record = this.batches.get(id);
+      if (record) {
+        (record as any).payload = parsed;
+        if (typeof parsed.total === "number") record.totalAmount = parsed.total;
+        if (typeof parsed.amount === "number") record.totalAmount = parsed.amount;
+        if (typeof parsed.totalAmount === "number") record.totalAmount = parsed.totalAmount;
+      }
     }
     this.snapshots.clear();
   }

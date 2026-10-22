@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { MerkleProofVisualizer } from "./MerkleProofModal.js";
 
 interface IngestionToolbarProps {
   sampleBatchId?: string;
@@ -11,6 +12,7 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [auditState, setAuditState] = useState<any | null>(null);
+  const [showProofVisualizer, setShowProofVisualizer] = useState(true);
 
   const handleScanDirectory = async () => {
     setLoading(true);
@@ -245,6 +247,21 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({
           >
             Agent Webhook
           </button>
+          <button
+            onClick={() => setShowProofVisualizer((prev) => !prev)}
+            style={{
+              padding: "7px 12px",
+              borderRadius: "6px",
+              background: showProofVisualizer ? "#1e293b" : "#6366f1",
+              color: "#fff",
+              border: "1px solid #4f46e5",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "12px",
+            }}
+          >
+            {showProofVisualizer ? "Hide Sentinel & Proof" : "Show Sentinel & Proof"}
+          </button>
         </div>
       </div>
 
@@ -294,6 +311,12 @@ export const IngestionToolbar: React.FC<IngestionToolbarProps> = ({
           >
             {JSON.stringify(auditState, null, 2)}
           </pre>
+        </div>
+      )}
+
+      {showProofVisualizer && (
+        <div style={{ marginTop: "14px" }}>
+          <MerkleProofVisualizer batchId={sampleBatchId} />
         </div>
       )}
     </div>

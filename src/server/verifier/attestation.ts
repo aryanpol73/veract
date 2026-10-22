@@ -76,15 +76,37 @@ export function generateReceipt(batchId: string, payloadDigest: string) {
   };
 }
 
-export function verifySignature(batchId: string, digest: string, signature: string): boolean {
-  const expectedHmac = crypto
+export function verifySignature(
+  batchId: string,
+  digest: string,
+  signature: string,
+  receiptId?: string,
+  issuedAt?: string,
+): boolean {
+  // Check direct receipt signature: `${batchId}:${digest}`
+  const hmacDirect = crypto
     .createHmac("sha256", ATTESTATION_SECRET)
     .update(`${batchId}:${digest}`)
     .digest("hex");
-  const bufA = Buffer.from(signature, "hex");
-  const bufB = Buffer.from(expectedHmac, "hex");
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  const bufDirect = Buffer.from(hmacDirect, "hex");
+  const bufSig = Buffer.from(signature, "hex");
+  if (bufDirect.length === bufSig.length && crypto.timingSafeEqual(bufDirect, bufSig)) {
+    return true;
+  }
+
+  // Check attestation signature: `${receiptId}:${batchId}:${digest}:${issuedAt}`
+  if (receiptId && issuedAt) {
+    const hmacAtt = crypto
+      .createHmac("sha256", ATTESTATION_SECRET)
+      .update(`${receiptId}:${batchId}:${digest}:${issuedAt}`)
+      .digest("hex");
+    const bufAtt = Buffer.from(hmacAtt, "hex");
+    if (bufAtt.length === bufSig.length && crypto.timingSafeEqual(bufAtt, bufSig)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**

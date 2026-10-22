@@ -103,9 +103,42 @@ export function generateMerkleProof(
   };
 }
 
-export function verifyMerkleProof(root: string, leaf: string, proof: MerkleProofStep[]): boolean {
+export function verifyMerkleProof(
+  arg1: string,
+  arg2: string | MerkleInclusionProof | MerkleProofStep[],
+  arg3?: string | MerkleProofStep[],
+): boolean {
+  let root = "";
+  let leaf = "";
+  let steps: MerkleProofStep[] = [];
+
+  if (typeof arg2 === "object" && "proof" in arg2 && typeof arg3 === "string") {
+    // verifyMerkleProof(leaf, proofObj, root)
+    leaf = arg1;
+    root = arg3;
+    steps = arg2.proof;
+  } else if (typeof arg2 === "string" && Array.isArray(arg3)) {
+    // verifyMerkleProof(root, leaf, proofSteps)
+    root = arg1;
+    leaf = arg2;
+    steps = arg3;
+  } else if (typeof arg1 === "string" && typeof arg2 === "object" && Array.isArray(arg2) && typeof arg3 === "string") {
+    // verifyMerkleProof(leaf, proofSteps, root)
+    leaf = arg1;
+    steps = arg2;
+    root = arg3;
+  } else if (typeof arg1 === "string" && typeof arg2 === "object" && "proof" in arg2) {
+    leaf = arg2.leaf;
+    root = arg1;
+    steps = arg2.proof;
+  }
+
+  if (!root || !leaf || !Array.isArray(steps)) {
+    return false;
+  }
+
   let currentHash = leaf;
-  for (const step of proof) {
+  for (const step of steps) {
     if (step.position === "right") {
       currentHash = hashPair(currentHash, step.hash);
     } else {
