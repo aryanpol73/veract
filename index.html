@@ -2,7 +2,12 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#070b14" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
     <title>Veract — Outcome-Metered Settlement Engine on PayPal v2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -59,24 +64,54 @@
         background: #38bdf8;
       }
       /* Custom dark styling for AG Grid Community */
-      .ag-theme-quartz-dark {
-        --ag-background-color: rgba(11, 18, 32, 0.75);
-        --ag-foreground-color: #f8fafc;
-        --ag-header-background-color: rgba(15, 23, 42, 0.95);
-        --ag-header-foreground-color: #38bdf8;
-        --ag-odd-row-background-color: rgba(15, 23, 42, 0.4);
-        --ag-row-hover-color: rgba(14, 165, 233, 0.12);
-        --ag-selected-row-background-color: rgba(16, 185, 129, 0.18);
-        --ag-border-color: rgba(51, 65, 85, 0.5);
+      .ag-theme-quartz,
+      .ag-theme-quartz-dark,
+      .ag-root-wrapper,
+      .ag-body-viewport,
+      .ag-center-cols-viewport {
+        background-color: #070b14 !important;
+        color: #f8fafc !important;
+        --ag-background-color: #070b14 !important;
+        --ag-header-background-color: #0b1120 !important;
+        --ag-odd-row-background-color: #090e1a !important;
+        --ag-row-hover-color: #131c31 !important;
+        --ag-foreground-color: #f8fafc !important;
+        --ag-header-foreground-color: #94a3b8 !important;
+        --ag-border-color: rgba(148, 163, 184, 0.12) !important;
+        --ag-row-border-color: rgba(148, 163, 184, 0.08) !important;
         --ag-font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
         --ag-font-size: 13px;
         --ag-header-font-size: 11px;
         --ag-header-font-weight: 700;
+      }
+
+      .ag-header {
+        border-bottom: 1px solid rgba(56, 189, 248, 0.15) !important;
+      }
+
+      .ag-row {
+        background-color: #070b14 !important;
+        color: #e2e8f0 !important;
+      }
+
+      .ag-row-hover {
+        background-color: #111a2e !important;
+      }
+
+      .ag-row-selected {
+        background-color: rgba(14, 165, 233, 0.14) !important;
       }
     </style>
   </head>
   <body class="min-h-screen antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
     <div id="root"></div>
     <script type="module" src="/src/client/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

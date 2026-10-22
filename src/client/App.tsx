@@ -37,6 +37,7 @@ import type {
   VendorContractFixture,
 } from "../shared/types.js";
 import { IngestionToolbar } from "./components/IngestionToolbar.js";
+import { PwaAppShell } from "./components/PwaAppShell.js";
 
 const veractGridTheme = themeQuartz.withParams({
   backgroundColor: "rgba(11, 18, 32, 0.75)",
@@ -120,6 +121,7 @@ export default function App() {
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [isAuditingAnim, setIsAuditingAnim] = useState(false);
+  const [usePwaShell, setUsePwaShell] = useState(false);
 
   // Live Custom Mutator state
   const [editSourceDoc, setEditSourceDoc] = useState<string>("");
@@ -256,6 +258,14 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
+      const isMobile = window.innerWidth < 768;
+      if (isStandalone || isMobile) {
+        setUsePwaShell(true);
+      }
+    }
+
     const params = new URLSearchParams(window.location.search);
     const returnedBatchId = params.get("batchId");
     const paypalState = params.get("paypal");
@@ -611,6 +621,83 @@ export default function App() {
   const capturedPct = isSettled ? (capturedCents / authorizedCents) * 100 : 0;
   const releasedPct = isSettled ? (releasedCents / authorizedCents) * 100 : 0;
 
+  const renderMatrixView = () => (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-[#0b1120] border border-white/[0.1] rounded-xl p-3">
+          <div className="text-[11px] text-slate-400 font-mono">PRE-AUTH HOLD</div>
+          <div className="text-xl font-bold font-mono text-white mt-1">{formatUsd(authorizedCents)}</div>
+        </div>
+        <div className="bg-[#0b1120] border border-white/[0.1] rounded-xl p-3">
+          <div className="text-[11px] text-slate-400 font-mono">VERIFIED CAPTURED</div>
+          <div className="text-xl font-bold font-mono text-cyan-300 mt-1">{formatUsd(capturedCents)}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col lovable-card border border-white/[0.1] rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.03]">
+          <span className="text-sm font-bold text-white tracking-tight">AG Grid Matrix</span>
+          <span className="text-xs font-mono text-cyan-300">$2.00 / verified task</span>
+        </div>
+        <div
+          className={`ag-theme-quartz-dark w-full transition-opacity duration-200 ${isAuditingAnim ? "opacity-40" : "opacity-100"}`}
+          style={{
+            height: 360,
+            width: "100%",
+            backgroundColor: "#070b14",
+            "--ag-background-color": "#070b14",
+            "--ag-header-background-color": "#0b1120",
+            "--ag-odd-row-background-color": "#090e1a",
+            "--ag-row-hover-color": "#131c31",
+            "--ag-selected-row-background-color": "rgba(56, 189, 248, 0.12)",
+            "--ag-foreground-color": "#f8fafc",
+            "--ag-header-foreground-color": "#94a3b8",
+            "--ag-border-color": "rgba(255, 255, 255, 0.08)",
+            "--ag-row-border-color": "rgba(255, 255, 255, 0.06)",
+          } as React.CSSProperties}
+        >
+          <AgGridReact<TaskVerificationResult>
+            theme={veractGridTheme}
+            rowData={rowData}
+            columnDefs={columnDefs}
+            rowHeight={56}
+            headerHeight={40}
+            suppressHorizontalScroll={true}
+            rowSelection={{ mode: "singleRow", checkboxes: false, enableClickSelection: true }}
+            onRowClicked={(e: RowClickedEvent<TaskVerificationResult>) => {
+              if (e.data?.taskId) setSelectedTaskId(e.data.taskId);
+            }}
+          />
+        </div>
+        <div className="p-3 bg-[#05070e]/95 border-t border-white/[0.08] flex flex-col gap-2">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="text-slate-300 truncate">
+              PayPal custom_id: <code className="text-cyan-300 font-semibold">{batch?.paypalCustomId || "VERACT:INIT"}</code>
+            </span>
+            <button
+              onClick={copyCliProof}
+              className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-200 border border-cyan-400/40"
+            >
+              {copiedCmd ? "Copied!" : "Copy Proof"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (usePwaShell) {
+    return (
+      <PwaAppShell
+        sampleBatchId={batch?.batchId || "VRCTBATCH001"}
+        isDesktopView={false}
+        onToggleDesktopView={() => setUsePwaShell(false)}
+        matrixSection={renderMatrixView()}
+        auditSection={<IngestionToolbar sampleBatchId={batch?.batchId || "VRCTBATCH001"} />}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col text-slate-100 bg-dot-grid relative overflow-hidden">
       {/* Ambient Luminous Glass Glow Orbs */}
@@ -703,6 +790,13 @@ export default function App() {
               >
                 <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                 Gemini 2.5 Flash
+              </button>
+              <button
+                onClick={() => setUsePwaShell(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition text-slate-300 hover:text-white hover:bg-slate-800 border border-white/[0.08]"
+                title="Switch to Mobile / Standalone App Shell"
+              >
+                📱 App Shell
               </button>
             </div>
           </div>
@@ -986,7 +1080,23 @@ export default function App() {
               </span>
             </div>
 
-            <div className={`w-full h-[325px] transition-opacity duration-200 ${isAuditingAnim ? "opacity-40" : "opacity-100"}`}>
+            <div
+              className={`ag-theme-quartz-dark w-full transition-opacity duration-200 ${isAuditingAnim ? "opacity-40" : "opacity-100"}`}
+              style={{
+                height: 360,
+                width: "100%",
+                backgroundColor: "#070b14",
+                "--ag-background-color": "#070b14",
+                "--ag-header-background-color": "#0b1120",
+                "--ag-odd-row-background-color": "#090e1a",
+                "--ag-row-hover-color": "#131c31",
+                "--ag-selected-row-background-color": "rgba(56, 189, 248, 0.12)",
+                "--ag-foreground-color": "#f8fafc",
+                "--ag-header-foreground-color": "#94a3b8",
+                "--ag-border-color": "rgba(255, 255, 255, 0.08)",
+                "--ag-row-border-color": "rgba(255, 255, 255, 0.06)",
+              } as React.CSSProperties}
+            >
               <AgGridReact<TaskVerificationResult>
                 theme={veractGridTheme}
                 rowData={rowData}

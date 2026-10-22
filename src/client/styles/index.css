@@ -1,0 +1,152 @@
+/* Force AG Grid Dark Theme for Veract Matrix */
+.ag-theme-quartz,
+.ag-theme-quartz-dark,
+.ag-root-wrapper,
+.ag-body-viewport,
+.ag-center-cols-viewport {
+  background-color: #070b14 !important;
+  color: #f8fafc !important;
+  --ag-background-color: #070b14 !important;
+  --ag-header-background-color: #0b1120 !important;
+  --ag-odd-row-background-color: #090e1a !important;
+  --ag-row-hover-color: #131c31 !important;
+  --ag-foreground-color: #f8fafc !important;
+  --ag-header-foreground-color: #94a3b8 !important;
+  --ag-border-color: rgba(148, 163, 184, 0.12) !important;
+  --ag-row-border-color: rgba(148, 163, 184, 0.08) !important;
+}
+
+.ag-header {
+  border-bottom: 1px solid rgba(56, 189, 248, 0.15) !important;
+}
+
+.ag-row {
+  background-color: #070b14 !important;
+  color: #e2e8f0 !important;
+}
+
+.ag-row-hover {
+  background-color: #111a2e !important;
+}
+
+.ag-row-selected {
+  background-color: rgba(14, 165, 233, 0.14) !important;
+}
+
+/* Native PWA App Shell & Bottom Navigation */
+.veract-app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background-color: #050811;
+  color: #f8fafc;
+  padding-bottom: 76px; /* Space for fixed bottom nav */
+}
+
+.veract-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background: rgba(7, 11, 20, 0.88);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.16);
+}
+
+.veract-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 10px #22c55e;
+}
+
+.veract-install-btn {
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  color: #ffffff;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.veract-app-viewport {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.veract-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #38bdf8;
+  margin-bottom: 12px;
+}
+
+.veract-sentinel-card {
+  background: #0b1120;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+/* Native Bottom Navigation Bar */
+.veract-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 66px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(9, 14, 26, 0.94);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(56, 189, 248, 0.18);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.veract-nav-item {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.veract-nav-item.active {
+  color: #38bdf8;
+}
+
+.veract-nav-item.active .veract-nav-icon {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+}
+
+.veract-nav-icon {
+  font-size: 18px;
+}
+
+.veract-nav-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
